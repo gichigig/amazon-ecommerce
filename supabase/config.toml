@@ -1,0 +1,46 @@
+# Supabase Configuration
+# This file is used to configure your Supabase project
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://localhost:5174"]
+jwt_expiry = 3600
+
+[auth.email]
+enable_signup = true
+enable_confirmations = false
+
+# Edge Functions Configuration
+[functions.mpesa-stk-push]
+verify_jwt = true
+
+[functions.mpesa-callback]
+verify_jwt = false  # M-Pesa callbacks don't include JWT
+
+# Environment variables for Edge Functions
+# Add these in your Supabase Dashboard under Settings > Edge Functions
+# Or use: supabase secrets set VARIABLE_NAME=value
+
+# Required environment variables:
+# MPESA_CONSUMER_KEY=your_consumer_key
+# MPESA_CONSUMER_SECRET=your_consumer_secret
+# MPESA_PASSKEY=bfb279f9aa9bdbcf158e97dd71a467cd2e0c893059b10f78e6b72ada1ed2c919
+# MPESA_SHORTCODE=174379
+# MPESA_ENVIRONMENT=sandbox
+# MPESA_CALLBACK_URL=https://your-project-ref.supabase.co/functions/v1/mpesa-callback
