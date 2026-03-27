@@ -58,3 +58,9 @@ coverage/
 
 # Local-only frontend workspace
 amazon-experience-frontend/
+
+# Backend build artifacts
+backend/target/
+
+# Temporary upload artifacts
+.tmp.driveupload/
