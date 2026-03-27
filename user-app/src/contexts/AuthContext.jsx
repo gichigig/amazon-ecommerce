@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 
 const AuthContext = createContext({})
 
@@ -16,47 +16,108 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setUser(session?.user ?? null)
+    // Check for existing token and get current user
+    const initAuth = async () => {
+      const token = api.getToken()
+      if (token) {
+        try {
+          const { data, error } = await api.getCurrentUser()
+          if (data && !error) {
+            setUser(data.user)
+          } else {
+            api.setTokens(null, null)
+          }
+        } catch (error) {
+          console.error('Error getting current user:', error)
+          api.setTokens(null, null)
+        }
+      }
       setLoading(false)
-    })
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
-    })
-
-    return () => subscription.unsubscribe()
+    }
+    
+    initAuth()
   }, [])
 
-  const signUp = async (email, password) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-    })
-    return { data, error }
+  // Check if user is a seller
+  const isSeller = () => {
+    return user?.seller || user?.roles?.includes('ROLE_SELLER')
+  }
+
+  const signUp = async (email, password, fullName = null) => {
+    try {
+      const { data, error } = await api.signUp(email, password, fullName)
+      if (error) {
+        return { data: null, error, blocked: error.blocked, remainingAttempts: error.remainingAttempts }
+      }
+      setUser(data.user)
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error, blocked: false }
+    }
+  }
+
+  // Sign up as seller with store name
+  const signUpAsSeller = async (email, password, fullName, storeName) => {
+    try {
+      const { data, error, blocked, remainingAttempts } = await api.signUpAsSeller(email, password, fullName, storeName)
+      if (error) {
+        return { data: null, error, blocked, remainingAttempts }
+      }
+      setUser(data.user)
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error, blocked: false }
+    }
+  }
+
+  // Upgrade existing user to seller
+  const upgradeToSeller = async (storeName) => {
+    try {
+      const { data, error } = await api.upgradeToSeller(storeName)
+      if (error) {
+        const msg = (error.message || '').toLowerCase()
+        if (msg.includes('already a seller')) {
+          const refreshed = await api.getCurrentUser()
+          if (refreshed.data?.user) {
+            setUser(refreshed.data.user)
+          }
+          return { data: refreshed.data || null, error: null }
+        }
+        return { data: null, error }
+      }
+      setUser(data.user)
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error }
+    }
   }
 
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    return { data, error }
+    try {
+      const { data, error, blocked, remainingAttempts } = await api.signIn(email, password)
+      if (error) {
+        return { data: null, error, blocked, remainingAttempts }
+      }
+      setUser(data.user)
+      return { data, error: null, remainingAttempts: data.remainingAttempts }
+    } catch (error) {
+      return { data: null, error, blocked: false }
+    }
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    return { error }
+    await api.signOut()
+    setUser(null)
+    return { error: null }
   }
 
   const value = {
     user,
     loading,
+    isSeller,
     signUp,
+    signUpAsSeller,
+    upgradeToSeller,
     signIn,
     signOut,
   }

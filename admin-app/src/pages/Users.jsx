@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 
 export default function Users() {
   const [users, setUsers] = useState([])
@@ -11,10 +11,7 @@ export default function Users() {
 
   const fetchUsers = async () => {
     try {
-      // Note: This requires proper RLS policies and admin access
-      const { data, error } = await supabase.from('users').select('*')
-
-      if (error) throw error
+      const data = await api.getUsers()
       setUsers(data || [])
     } catch (error) {
       console.error('Error fetching users:', error)

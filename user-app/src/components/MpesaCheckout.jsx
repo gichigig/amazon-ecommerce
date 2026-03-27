@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 
 export default function MpesaCheckout({ cartItems, total, onSuccess }) {
@@ -31,6 +31,7 @@ export default function MpesaCheckout({ cartItems, total, onSuccess }) {
     if (!formattedPhone.startsWith('254') || formattedPhone.length !== 12) {
       setMessage('Please enter a valid Kenyan phone number (e.g., 0712345678)')
       setLoading(false)
+      processingRef.current = false
       return
     }
 
@@ -38,64 +39,27 @@ export default function MpesaCheckout({ cartItems, total, onSuccess }) {
 
     try {
       // Create order in database
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert({
-          user_id: user.id,
-          total_amount: total,
-          status: 'pending_payment',
-          payment_method: 'mpesa',
-          mpesa_phone: formattedPhone,
-        })
-        .select()
-        .single()
-
-      if (orderError) throw orderError
-
-      // Create order items
-      const orderItems = cartItems.map((item) => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        quantity: item.quantity,
-        price: item.products.price,
-      }))
-
-      const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems)
-
-      if (itemsError) throw itemsError
-
-      // Get user session for authentication
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session) {
-        throw new Error('Please login to continue')
+      const orderData = {
+        items: cartItems.map((item) => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          price: item.product.price,
+        })),
+        totalAmount: total,
+        paymentMethod: 'mpesa',
+        mpesaPhone: formattedPhone,
       }
 
-      // Call M-Pesa Edge Function
+      const order = await api.createOrder(orderData)
+      console.log('Order created:', order.id)
+
+      // Call M-Pesa STK Push
       setMessage(`Initiating M-Pesa payment...`)
       
-      console.log('Calling STK Push Edge Function for order:', order.id)
+      console.log('Calling STK Push for order:', order.id)
       
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/mpesa-stk-push`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            phone: formattedPhone,
-            amount: total,
-            orderId: order.id,
-            accountReference: 'E-Commerce Store',
-          }),
-        }
-      )
+      const result = await api.initiateSTKPush(formattedPhone, total, order.id, 'E-Commerce Store')
 
-      const result = await response.json()
       console.log('STK Push response:', result)
 
       if (!result.success) {
@@ -123,24 +87,12 @@ export default function MpesaCheckout({ cartItems, total, onSuccess }) {
       attempts++
 
       try {
-        const { data: order, error } = await supabase
-          .from('orders')
-          .select('status, mpesa_receipt_number')
-          .eq('id', orderId)
-          .single()
+        const order = await api.getOrder(orderId)
 
-        if (error) throw error
-
-        if (order.status === 'paid') {
+        if (order.status === 'PAID') {
           clearInterval(interval)
-          setMessage(`Payment successful! Receipt: ${order.mpesa_receipt_number}`)
+          setMessage(`Payment successful! Receipt: ${order.mpesaReceiptNumber}`)
           
-          // Clear cart
-          await supabase
-            .from('cart_items')
-            .delete()
-            .eq('user_id', user.id)
-
           setLoading(false)
           processingRef.current = false
 
@@ -148,7 +100,7 @@ export default function MpesaCheckout({ cartItems, total, onSuccess }) {
           if (onSuccess) {
             setTimeout(() => onSuccess(), 2000)
           }
-        } else if (order.status === 'cancelled' || attempts >= maxAttempts) {
+        } else if (order.status === 'CANCELLED' || attempts >= maxAttempts) {
           clearInterval(interval)
           setMessage('Payment timeout or cancelled. Please try again.')
           setLoading(false)
@@ -191,8 +143,8 @@ export default function MpesaCheckout({ cartItems, total, onSuccess }) {
                 <div className="summary-items">
                   {cartItems.map((item) => (
                     <div key={item.id} className="summary-item">
-                      <span>{item.products.name} (x{item.quantity})</span>
-                      <span>KSH {(item.products.price * item.quantity).toLocaleString()}</span>
+                      <span>{item.product.name} (x{item.quantity})</span>
+                      <span>KSH {(item.product.price * item.quantity).toLocaleString()}</span>
                     </div>
                   ))}
                 </div>

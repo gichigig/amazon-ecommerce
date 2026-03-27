@@ -55,3 +55,6 @@ coverage/
 *.tmp
 *.temp
 .cache/
+
+# Local-only frontend workspace
+amazon-experience-frontend/

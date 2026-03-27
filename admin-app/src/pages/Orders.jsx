@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 
 export default function Orders() {
   const [orders, setOrders] = useState([])
@@ -11,19 +11,7 @@ export default function Orders() {
 
   const fetchOrders = async () => {
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .select(`
-          *,
-          users (email),
-          order_items (
-            *,
-            products (name, price)
-          )
-        `)
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
+      const data = await api.getAllOrders()
       setOrders(data || [])
     } catch (error) {
       console.error('Error fetching orders:', error)
@@ -34,12 +22,7 @@ export default function Orders() {
 
   const updateOrderStatus = async (orderId, newStatus) => {
     try {
-      const { error } = await supabase
-        .from('orders')
-        .update({ status: newStatus })
-        .eq('id', orderId)
-
-      if (error) throw error
+      await api.updateOrderStatus(orderId, newStatus)
       fetchOrders()
     } catch (error) {
       console.error('Error updating order:', error)
@@ -64,9 +47,9 @@ export default function Orders() {
               <div className="order-header">
                 <div>
                   <h3>Order #{order.id.slice(0, 8)}</h3>
-                  <p className="order-email">{order.users?.email}</p>
+                  <p className="order-email">{order.userEmail}</p>
                   <p className="order-date">
-                    {new Date(order.created_at).toLocaleDateString()}
+                    {new Date(order.createdAt).toLocaleDateString()}
                   </p>
                 </div>
                 <div>
@@ -75,30 +58,32 @@ export default function Orders() {
                     onChange={(e) => updateOrderStatus(order.id, e.target.value)}
                     className="status-select"
                   >
-                    <option value="pending">Pending</option>
-                    <option value="processing">Processing</option>
-                    <option value="shipped">Shipped</option>
-                    <option value="delivered">Delivered</option>
-                    <option value="cancelled">Cancelled</option>
+                    <option value="PENDING">Pending</option>
+                    <option value="PENDING_PAYMENT">Pending Payment</option>
+                    <option value="PAID">Paid</option>
+                    <option value="PROCESSING">Processing</option>
+                    <option value="SHIPPED">Shipped</option>
+                    <option value="DELIVERED">Delivered</option>
+                    <option value="CANCELLED">Cancelled</option>
                   </select>
                 </div>
               </div>
 
               <div className="order-items">
                 <h4>Items:</h4>
-                {order.order_items?.map((item, index) => (
+                {order.orderItems?.map((item, index) => (
                   <div key={index} className="order-item">
-                    <span>{item.products?.name}</span>
+                    <span>{item.productName}</span>
                     <span>Qty: {item.quantity}</span>
-                    <span>KSH {item.products?.price?.toLocaleString()}</span>
+                    <span>KSH {item.price?.toLocaleString()}</span>
                   </div>
                 ))}
               </div>
 
               <div className="order-total">
-                <strong>Total: KSH {order.total_amount.toLocaleString()}</strong>
-                {order.mpesa_phone && (
-                  <p className="payment-info">M-Pesa: {order.mpesa_phone}</p>
+                <strong>Total: KSH {order.totalAmount.toLocaleString()}</strong>
+                {order.mpesaPhone && (
+                  <p className="payment-info">M-Pesa: {order.mpesaPhone}</p>
                 )}
               </div>
             </div>

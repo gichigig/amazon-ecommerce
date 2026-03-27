@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react'
-import { supabase } from '../lib/supabase'
+import { api } from '../lib/api'
 
 const AuthContext = createContext({})
 
@@ -17,103 +17,46 @@ export const AuthProvider = ({ children }) => {
   const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
-    // Get initial session
+    // Check for existing token and get current user
     const initAuth = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        console.log('Initial session:', session?.user?.email || 'No user')
-        setUser(session?.user ?? null)
-        
-        if (session?.user) {
-          await checkAdminStatus(session.user.id)
-        } else {
-          setIsAdmin(false)
+      const token = api.getToken()
+      if (token) {
+        try {
+          const { data, error } = await api.getCurrentUser()
+          if (data && !error) {
+            setUser(data.user)
+            setIsAdmin(data.user.isAdmin || data.user.admin)
+          } else {
+            api.setToken(null)
+          }
+        } catch (error) {
+          console.error('Error getting current user:', error)
+          api.setToken(null)
         }
-      } catch (error) {
-        console.error('Auth init error:', error)
-        setIsAdmin(false)
-      } finally {
-        setLoading(false)
       }
+      setLoading(false)
     }
-
+    
     initAuth()
-
-    // Fallback timeout to prevent infinite loading
-    const timeout = setTimeout(() => {
-      console.warn('Auth check timeout - forcing loading to false')
-      setLoading(false)
-    }, 5000) // 5 second timeout
-
-    // Listen for auth changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('Auth state changed:', _event, session?.user?.email || 'No user')
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        setLoading(true)
-        await checkAdminStatus(session.user.id)
-      } else {
-        setIsAdmin(false)
-      }
-      setLoading(false)
-    })
-
-    return () => {
-      subscription.unsubscribe()
-      clearTimeout(timeout)
-    }
   }, [])
 
-  const checkAdminStatus = async (userId) => {
-    console.log('Checking admin status for user:', userId)
-    try {
-      // Set a timeout for the query
-      const timeoutPromise = new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Admin check timeout')), 3000)
-      )
-
-      const queryPromise = supabase
-        .from('admins')
-        .select('*')
-        .eq('user_id', userId)
-        .maybeSingle()
-
-      const { data, error } = await Promise.race([queryPromise, timeoutPromise])
-
-      console.log('Admin check result:', { data, error })
-
-      if (error) {
-        console.error('Admin check error:', error)
-        setIsAdmin(false)
-        return
-      }
-
-      if (data) {
-        console.log('User IS an admin')
-        setIsAdmin(true)
-      } else {
-        console.log('User is NOT an admin (no record found)')
-        setIsAdmin(false)
-      }
-    } catch (error) {
-      console.error('Error checking admin status:', error)
-      setIsAdmin(false)
-    }
-  }
-
   const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-    return { data, error }
+    try {
+      const { data, error } = await api.signIn(email, password)
+      if (error) throw error
+      setUser(data.user)
+      setIsAdmin(data.user.isAdmin || data.user.admin)
+      return { data, error: null }
+    } catch (error) {
+      return { data: null, error }
+    }
   }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut()
-    return { error }
+    await api.signOut()
+    setUser(null)
+    setIsAdmin(false)
+    return { error: null }
   }
 
   const value = {

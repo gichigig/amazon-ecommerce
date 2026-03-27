@@ -1,34 +1,28 @@
-# User App - E-Commerce Storefront# React + Vite
+# Bluvberry Sales - Unified E-Commerce App
 
+A unified React application for both **customers** and **sellers**. Customers can browse and purchase products, while sellers can manage their stores, products, and orders.
 
+## Features
 
-Customer-facing React application for browsing and purchasing products.This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
-
-
-
-## FeaturesCurrently, two official plugins are available:
-
-
-
-- 🏠 Product browsing with grid layout- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-
-- 🔍 Product detail pages- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
-
+### Customer Features
+- 🏠 Product browsing with grid layout
+- 🔍 Product detail pages with reviews
 - 🔐 User authentication (Sign up/Login)
-
-- 🛒 Shopping cart management## React Compiler
-
+- 🛒 Shopping cart management
+- ❤️ Favourites/Wishlist
+- 💳 M-Pesa payment integration
 - 📱 Responsive design
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Seller Features
+- 🏪 Seller Dashboard with stats
+- 📦 Product Management (Add/Edit/Delete)
+- 🛒 Order Management with status updates
+- 📊 Revenue tracking
+- 🔄 Easy switch between customer and seller views
 
 ## Getting Started
 
-## Expanding the ESLint configuration
-
 ### Install Dependencies
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
 
 ```powershell
 npm install
@@ -36,11 +30,10 @@ npm install
 
 ### Configure Environment
 
-Copy `.env.example` to `.env` and add your Supabase credentials:
+Create a `.env` file with your API URL:
 
 ```
-VITE_SUPABASE_URL=your_supabase_url
-VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
+VITE_API_URL=http://localhost:8080/api
 ```
 
 ### Run Development Server

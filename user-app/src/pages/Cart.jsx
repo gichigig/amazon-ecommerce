@@ -1,88 +1,30 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useCart } from '../contexts/CartContext'
 import MpesaCheckout from '../components/MpesaCheckout'
 
 export default function Cart() {
   const { user } = useAuth()
+  const { cartItems, loading, updateQuantity: updateCartQuantity, removeFromCart, getCartTotal, refreshCart } = useCart()
   const navigate = useNavigate()
-  const [cartItems, setCartItems] = useState([])
-  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (user) {
-      fetchCartItems()
+      refreshCart()
     }
   }, [user])
 
-  const fetchCartItems = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('cart_items')
-        .select(`
-          *,
-          products (
-            id,
-            name,
-            price,
-            image_url
-          )
-        `)
-        .eq('user_id', user.id)
-
-      if (error) throw error
-      setCartItems(data || [])
-    } catch (error) {
-      console.error('Error fetching cart:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const updateQuantity = async (itemId, newQuantity) => {
+  const handleUpdateQuantity = async (itemId, newQuantity) => {
     if (newQuantity < 1) return
-
-    try {
-      const { error } = await supabase
-        .from('cart_items')
-        .update({ quantity: newQuantity })
-        .eq('id', itemId)
-
-      if (error) throw error
-      fetchCartItems()
-    } catch (error) {
-      console.error('Error updating quantity:', error)
-    }
+    await updateCartQuantity(itemId, newQuantity)
   }
 
-  const removeItem = async (itemId) => {
-    try {
-      const { error } = await supabase
-        .from('cart_items')
-        .delete()
-        .eq('id', itemId)
-
-      if (error) throw error
-      fetchCartItems()
-    } catch (error) {
-      console.error('Error removing item:', error)
-    }
+  const handleRemoveItem = async (itemId) => {
+    await removeFromCart(itemId)
   }
 
-  const total = cartItems.reduce(
-    (sum, item) => sum + item.products.price * item.quantity,
-    0
-  )
-
-  if (!user) {
-    return (
-      <div className="cart-page">
-        <h2>Shopping Cart</h2>
-        <p>Please sign in to view your cart</p>
-      </div>
-    )
-  }
+  const total = getCartTotal()
 
   if (loading) {
     return <div className="loading-container"><p>Loading cart...</p></div>
@@ -92,54 +34,93 @@ export default function Cart() {
     <div className="cart-page">
       <h2>Shopping Cart</h2>
       {cartItems.length === 0 ? (
-        <p>Your cart is empty</p>
+        <div className="empty-cart">
+          <p>Your cart is empty</p>
+          <button className="btn btn-primary" onClick={() => navigate('/')}>
+            Continue Shopping
+          </button>
+        </div>
       ) : (
         <>
           <div className="cart-items">
-            {cartItems.map((item) => (
-              <div key={item.id} className="cart-item">
-                {item.products.image_url && (
-                  <img src={item.products.image_url} alt={item.products.name} />
-                )}
-                <div className="item-details">
-                  <h3>{item.products.name}</h3>
-                  <p className="price">KSH {item.products.price.toLocaleString()}</p>
-                  <div className="quantity-controls">
-                    <button
-                      onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                    >
-                      -
-                    </button>
-                    <span>{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                    >
-                      +
-                    </button>
+            {cartItems.map((item) => {
+              const product = item.product || item
+              const price = product.price || 0
+              const imageUrl = product.imageUrl || product.image_url
+              const name = product.name || 'Unknown Product'
+              const itemId = item.id || item.productId
+              const stock = product.stock ?? 999
+              const isOutOfStock = stock === 0
+              const canIncrease = item.quantity < stock
+              
+              return (
+                <div key={itemId} className="cart-item">
+                  {imageUrl && (
+                    <img src={imageUrl} alt={name} />
+                  )}
+                  <div className="item-details">
+                    <h3>{name}</h3>
+                    {isOutOfStock ? (
+                      <span className="out-of-stock-badge">Out of Stock</span>
+                    ) : (
+                      <>
+                        <p className="price">KSH {price.toLocaleString()}</p>
+                        <div className="quantity-controls">
+                          <button
+                            onClick={() => handleUpdateQuantity(itemId, item.quantity - 1)}
+                            disabled={item.quantity <= 1}
+                          >
+                            −
+                          </button>
+                          <span>{item.quantity}</span>
+                          <button
+                            onClick={() => handleUpdateQuantity(itemId, item.quantity + 1)}
+                            disabled={!canIncrease}
+                          >
+                            +
+                          </button>
+                        </div>
+                        {stock <= 5 && stock > 0 && (
+                          <p className="stock-warning">Only {stock} left in stock</p>
+                        )}
+                        {!canIncrease && item.quantity >= stock && (
+                          <p className="stock-warning">Maximum quantity reached</p>
+                        )}
+                        <p className="subtotal">
+                          Subtotal: KSH {(price * item.quantity).toLocaleString()}
+                        </p>
+                      </>
+                    )}
                   </div>
-                  <p className="subtotal">
-                    Subtotal: KSH {(item.products.price * item.quantity).toLocaleString()}
-                  </p>
+                  <button
+                    className="btn btn-danger"
+                    onClick={() => handleRemoveItem(itemId)}
+                  >
+                    Remove
+                  </button>
                 </div>
-                <button
-                  className="btn btn-danger"
-                  onClick={() => removeItem(item.id)}
-                >
-                  Remove
-                </button>
-              </div>
-            ))}
+              )
+            })}
           </div>
           <div className="cart-summary">
             <h3>Total: KSH {total.toLocaleString()}</h3>
-            <MpesaCheckout 
-              cartItems={cartItems} 
-              total={total}
-              onSuccess={() => {
-                alert('Payment successful! Thank you for your order.')
-                navigate('/')
-              }}
-            />
+            {user ? (
+              <MpesaCheckout 
+                cartItems={cartItems} 
+                total={total}
+                onSuccess={() => {
+                  alert('Payment successful! Thank you for your order.')
+                  navigate('/')
+                }}
+              />
+            ) : (
+              <div className="login-prompt">
+                <p>Please sign in to checkout</p>
+                <button className="btn btn-primary" onClick={() => navigate('/login')}>
+                  Sign In
+                </button>
+              </div>
+            )}
           </div>
         </>
       )}

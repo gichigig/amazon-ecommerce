@@ -1,8 +1,9 @@
 {
-  "name": "user-app",
+  "name": "bluvberry-app",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
+  "description": "Bluvberry Sales - E-commerce app for customers and sellers",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

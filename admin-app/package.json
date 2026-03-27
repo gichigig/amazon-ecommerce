@@ -11,7 +11,9 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.78.0",
+    "chart.js": "^4.4.7",
     "react": "^19.1.1",
+    "react-chartjs-2": "^5.2.0",
     "react-dom": "^19.1.1",
     "react-router-dom": "^7.9.5"
   },
